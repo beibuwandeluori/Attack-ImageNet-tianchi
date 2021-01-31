@@ -13,13 +13,13 @@ class Normalize(nn.Module):
         size = input.size()
         x = input.clone()
         for i in range(size[1]):
-            x[:,i] = (x[:,i] - self.mean[i])/self.std[i]
+            x[:, i] = (x[:, i] - self.mean[i])/self.std[i]
 
         return x
 
-class Permute(nn.Module):
 
-    def __init__(self, permutation = [2,1,0]):
+class Permute(nn.Module):
+    def __init__(self, permutation=[2,1,0]):
         super().__init__()
         self.permutation = permutation
 

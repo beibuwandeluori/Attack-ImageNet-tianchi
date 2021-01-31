@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import math
 
+
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -95,6 +96,7 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 class Denoise(nn.Module):
 
     def __init__(self, channel, embed=True, softmax=True):
@@ -179,6 +181,7 @@ class DenoiseBottleneck(nn.Module):
         out = self.denoise(out)
 
         return out
+
 
 class ResNet(nn.Module):
 
@@ -275,15 +278,18 @@ class ResNet(nn.Module):
 
         return x
 
+
 def resnet152():
     model = ResNet(Bottleneck, [3, 8, 36, 3])
 
     return model
 
+
 def resnet152_denoise():
     model = ResNet(Bottleneck, [3, 8, 36, 3], denoise=True)
 
     return model
+
 
 def resnet101_denoise():
     model = ResNet(DenoiseBottleneck, [3, 4, 23, 3], denoise=False, width_per_group=8, groups=32)

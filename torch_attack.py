@@ -7,72 +7,39 @@ import cv2
 import numpy as np
 import glob
 
-from attacker import Attacker, AttackerPGD
-from loader import ImageNet_A
+from attacker import Attacker, AttackerPGD, AttackerTPGD, AttackerMIFGSM
+import torchattacks
+from loader import ImageNet_A, input_diversity
 from models.models import model_selection
 from utils.Resnet import resnet152_denoise, resnet101_denoise, resnet152
 from utils.Normalize import Normalize, Permute
 
 
 class Ensemble(nn.Module):
-    def __init__(self, model1, model2, model3):
+    def __init__(self, model1, model2=None, model3=None):
         super(Ensemble, self).__init__()
         self.model1 = model1
         self.model2 = model2
-        self.model3 = model3
+        # self.model3 = model3
 
     def forward(self, x):
         logits1 = self.model1(x)
         logits2 = self.model2(x)
-        logits3 = self.model3(x)
+        # logits3 = self.model3(x)
 
         # fuse logits
-        logits_e = (logits1 + logits2 + logits3) / 3
+        logits_e = (logits1 + logits2) / 2
 
         return logits_e
-
-
-def load_model():
-    pretrained_model1 = resnet101_denoise()
-    loaded_state_dict = torch.load(os.path.join('weight', 'Adv_Denoise_Resnext101.pytorch'))
-    pretrained_model1.load_state_dict(loaded_state_dict, strict=True)
-
-    pretrained_model2 = resnet152_denoise()
-    loaded_state_dict = torch.load(os.path.join('weight', 'Adv_Denoise_Resnet152.pytorch'))
-    pretrained_model2.load_state_dict(loaded_state_dict)
-
-    pretrained_model3 = resnet152()
-    loaded_state_dict = torch.load(os.path.join('weight', 'Adv_Resnet152.pytorch'))
-    pretrained_model3.load_state_dict(loaded_state_dict)
-
-    model1 = nn.Sequential(
-            Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-            Permute([2, 1, 0]),
-            pretrained_model1
-        )
-    
-    model2 = nn.Sequential(
-            Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-            Permute([2, 1, 0]),
-            pretrained_model2
-        )
-
-    model3 = nn.Sequential(
-            Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-            Permute([2, 1, 0]),
-            pretrained_model3
-        )
-
-    return model1, model2, model3
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_dir', default='/raid/chenby/tianchi/imagenet/', type=str, help='path to data')
-    parser.add_argument('--output_dir', default='./results/02_ensemble_nt_200_500_step50_PGD/', type=str, help='path to results')
-    parser.add_argument('--batch_size', default=2, type=int, help='mini-batch size')
-    parser.add_argument('--steps', default=50, type=int, help='iteration steps')
-    parser.add_argument('--max_norm', default=16, type=float, help='Linf limit')
+    parser.add_argument('--output_dir', default='./results/04_ensemble_MIM_div_step100_8/', type=str, help='path to results')
+    parser.add_argument('--batch_size', default=8, type=int, help='mini-batch size')
+    parser.add_argument('--steps', default=100, type=int, help='iteration steps')
+    parser.add_argument('--max_norm', default=8, type=float, help='Linf limit')
     parser.add_argument('--div_prob', default=0.9, type=float, help='probability of diversity')
     args = parser.parse_args()
 
@@ -80,12 +47,15 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "5"
     # ensemble model
-    model1, model2, model3 = load_model()
-    model = Ensemble(model1, model2, model3)
-    # model = EnsembleModels(model_names=['resnet50', 'se_resnext50_32x4d', 'efficientnet-b2', 'tf_efficientnet_b2_ns'],
-    #                        use_cuda=True)
+    model1 = model_selection(model_name='efficientnet-b5', advprop=False)  # efficientnet-b5
+    model2 = model_selection(model_name='resnet50')  # efficientnet-b5
+    model = Ensemble(model1, model2)
+    model = nn.Sequential(
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        model
+    )
 
     model.cuda()
     model.eval()
@@ -103,16 +73,19 @@ if __name__ == '__main__':
     #                     device=torch.device('cuda'),
     #                     low=200,
     #                     high=500)
-    attacker = AttackerPGD(model, eps=args.max_norm / 255.0, alpha=2 / 255.0, steps=args.steps, low=200, high=500,
-                           div_prob=args.div_prob)
+    # attacker = torchattacks.PGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps)
+    # attacker = AttackerPGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps, low=200, high=500,
+    #                        div_prob=args.div_prob)
+    # attacker = AttackerTPGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps, low=200, high=500,
+    #                        div_prob=args.div_prob)
+    attacker = AttackerMIFGSM(model, eps=args.max_norm / 255.0, decay=1.0, steps=args.steps, low=200, high=500,
+                              div_prob=args.div_prob)
 
     for ind, (img, label_true, label_target, filenames) in enumerate(loader):
-        if os.path.exists(os.path.join(output_dir, os.path.split(filenames[-1])[-1])):
-            continue
+
         # run attack
         # adv = attacker.attack(model, img.cuda(), label_true.cuda(), label_target.cuda())
         adv = attacker(img.cuda(), label_true.cuda())
-
         # save results
         for bind, filename in enumerate(filenames):
             out_img = adv[bind].detach().cpu().numpy()
