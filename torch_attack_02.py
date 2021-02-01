@@ -37,10 +37,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # /raid/chenby/tianchi/imagenet/
     parser.add_argument('--input_dir', default='/raid/chenby/tianchi/imagenet/', type=str, help='path to data')
-    parser.add_argument('--output_dir', default='./results/05_ensemble_MIM_div_step100_8/', type=str, help='path to results')
+    parser.add_argument('--output_dir', default='./results/06_ensemble_MIM_div_step60_16/', type=str, help='path to results')
     parser.add_argument('--batch_size', default=8, type=int, help='mini-batch size')
-    parser.add_argument('--steps', default=100, type=int, help='iteration steps')
-    parser.add_argument('--max_norm', default=8, type=float, help='Linf limit')
+    parser.add_argument('--steps', default=60, type=int, help='iteration steps')
+    parser.add_argument('--max_norm', default=16, type=float, help='Linf limit')
     parser.add_argument('--div_prob', default=0.9, type=float, help='probability of diversity')
     args = parser.parse_args()
 
@@ -48,19 +48,19 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "6"
     # ensemble model
-    model1 = model_selection(model_name='efficientnet-b5', advprop=False)  # efficientnet-b5
-    model1 = nn.Sequential(
-        Resize(input_size=[456, 456]),
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        model1
-    )
-    model2 = model_selection(model_name='resnet50')  # efficientnet-b5
+    model1 = model_selection(model_name='resnet152', advprop=False)  # efficientnet-b5
     model1 = nn.Sequential(
         Resize(input_size=[224, 224]),
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         model1
+    )
+    model2 = model_selection(model_name='vgg19')  # efficientnet-b5
+    model2 = nn.Sequential(
+        Resize(input_size=[224, 224]),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        model2
     )
     model = Ensemble(model1, model2)
     # print(model)
