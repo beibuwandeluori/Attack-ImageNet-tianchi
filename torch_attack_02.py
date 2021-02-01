@@ -12,7 +12,7 @@ import torchattacks
 from loader import ImageNet_A, input_diversity
 from models.models import model_selection
 from utils.Resnet import resnet152_denoise, resnet101_denoise, resnet152
-from utils.Normalize import Normalize, Permute
+from utils.Normalize import Normalize, Permute, Resize
 
 
 class Ensemble(nn.Module):
@@ -37,10 +37,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # /raid/chenby/tianchi/imagenet/
     parser.add_argument('--input_dir', default='/raid/chenby/tianchi/imagenet/', type=str, help='path to data')
-    parser.add_argument('--output_dir', default='./results/04_ensemble_MIM_div_step200_4/', type=str, help='path to results')
+    parser.add_argument('--output_dir', default='./results/05_ensemble_MIM_div_step100_8/', type=str, help='path to results')
     parser.add_argument('--batch_size', default=8, type=int, help='mini-batch size')
-    parser.add_argument('--steps', default=200, type=int, help='iteration steps')
-    parser.add_argument('--max_norm', default=4, type=float, help='Linf limit')
+    parser.add_argument('--steps', default=100, type=int, help='iteration steps')
+    parser.add_argument('--max_norm', default=8, type=float, help='Linf limit')
     parser.add_argument('--div_prob', default=0.9, type=float, help='probability of diversity')
     args = parser.parse_args()
 
@@ -48,23 +48,30 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "4"
     # ensemble model
     model1 = model_selection(model_name='efficientnet-b5', advprop=False)  # efficientnet-b5
-    model2 = model_selection(model_name='resnet50')  # efficientnet-b5
-    model = Ensemble(model1, model2)
-    model = nn.Sequential(
+    model1 = nn.Sequential(
+        Resize(input_size=[456, 456]),
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        model
+        model1
     )
+    model2 = model_selection(model_name='resnet50')  # efficientnet-b5
+    model1 = nn.Sequential(
+        Resize(input_size=[224, 224]),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        model1
+    )
+    model = Ensemble(model1, model2)
+    # print(model)
 
     model.cuda()
     model.eval()
 
     # set dataset
     dataset = ImageNet_A(args.input_dir)
-    loader = torch.utils.data.DataLoader(dataset, 
-                                         batch_size=args.batch_size, 
+    loader = torch.utils.data.DataLoader(dataset,
+                                         batch_size=args.batch_size,
                                          shuffle=False)
 
     # set attacker

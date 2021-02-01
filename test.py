@@ -8,7 +8,7 @@ import numpy as np
 from loader import ImageNet_A, get_transforms
 from models.models import model_selection
 from utils.Resnet import resnet152_denoise, resnet101_denoise, resnet152
-from utils.Normalize import Normalize, Permute
+from utils.Normalize import Normalize, Permute, Resize
 
 
 class Ensemble(nn.Module):
@@ -82,26 +82,36 @@ if __name__ == '__main__':
     std = [0.229, 0.224, 0.225]
     # mean = [0.5, 0.5, 0.5]
     # std = [0.5, 0.5, 0.5]
+
+    input_dir = '/raid/chenby/tianchi/imagenet/'
+    # input_dir = '/data1/cby/py_project/Attack-ImageNet/results/04_ensemble_MIM_div_step100_8_iter2_step50_4/'
+    batch_size = 32
+    size = 456  # 456
+    size_2 = 224
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "7"
     # ensemble model
     # model = load_model()
-    model = model_selection(model_name='efficientnet-b5', advprop=True)  # efficientnet-b5
-    # model2 = model_selection(model_name='efficientnet-b0', advprop=True)
-    # model = Ensemble(model, model2)
-    # model = nn.Sequential(
+    model = model_selection(model_name='efficientnet-b5', advprop=False)  # efficientnet-b5
+    model = nn.Sequential(
+        Resize(input_size=[size, size]),
+        Normalize(mean, std),
+        model
+    )
+    # model2 = model_selection(model_name='resnet50', advprop=False)
+    # model2 = nn.Sequential(
+    #     Resize(input_size=[size_2, size_2]),
     #     Normalize(mean, std),
-    #     model
+    #     model2
     # )
+    # model = Ensemble(model, model2)
+
     model.cuda()
     model.eval()
 
-    # input_dir = '/raid/chenby/tianchi/imagenet/'
-    input_dir = '/data1/cby/py_project/Attack-ImageNet/results/04_ensemble_MIM_div/'
-    batch_size = 32
-    size = 224  # 456
     # set dataset
-    dataset = ImageNet_A(input_dir, use_target=False, transforms=get_transforms(size, mean, std))
-    # dataset = ImageNet_A(input_dir, use_target=False, transforms=None)
+    # dataset = ImageNet_A(input_dir, use_target=False, transforms=get_transforms(size, mean, std))
+    dataset = ImageNet_A(input_dir, use_target=False, transforms=None)
     loader = torch.utils.data.DataLoader(dataset,
                                          batch_size=batch_size,
                                          shuffle=False)
