@@ -20,27 +20,29 @@ class Ensemble(nn.Module):
         super(Ensemble, self).__init__()
         self.model1 = model1
         self.model2 = model2
-        # self.model3 = model3
+        self.model3 = model3
 
     def forward(self, x):
         logits1 = self.model1(x)
         logits2 = self.model2(x)
-        # logits3 = self.model3(x)
 
-        # fuse logits
-        logits_e = (logits1 + logits2) / 2
+        if self.model3 is not None:
+            logits3 = self.model3(x)
+            logits = (logits1 + logits2 + logits3) / 3
+        else:
+            logits = (logits1 + logits2) / 2
 
-        return logits_e
+        return logits
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # /raid/chenby/tianchi/imagenet/
-    parser.add_argument('--input_dir', default='/raid/chenby/tianchi/imagenet/', type=str, help='path to data')
-    parser.add_argument('--output_dir', default='./results/05_ensemble_MIM_div_step100_8_l400/', type=str, help='path to results')
+    parser.add_argument('--input_dir', default='/data1/cby/py_project/Attack-ImageNet/results/09_ensemble3_MIM_div_step100_8', type=str, help='path to data')
+    parser.add_argument('--output_dir', default='./results/09_ensemble3_MIM_div_step100_8_step100_4/', type=str, help='path to results')
     parser.add_argument('--batch_size', default=8, type=int, help='mini-batch size')
     parser.add_argument('--steps', default=100, type=int, help='iteration steps')
-    parser.add_argument('--max_norm', default=8, type=float, help='Linf limit')
+    parser.add_argument('--max_norm', default=4, type=float, help='Linf limit')
     parser.add_argument('--div_prob', default=0.9, type=float, help='probability of diversity')
     args = parser.parse_args()
 
@@ -62,7 +64,13 @@ if __name__ == '__main__':
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         model2
     )
-    model = Ensemble(model1, model2)
+    model3 = model_selection(model_name='inceptionv4')  # efficientnet-b5
+    model3 = nn.Sequential(
+        Resize(input_size=[299, 299]),
+        Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        model3
+    )
+    model = Ensemble(model1, model2, model3)
     # print(model)
 
     model.cuda()
@@ -86,7 +94,7 @@ if __name__ == '__main__':
     #                        div_prob=args.div_prob)
     # attacker = AttackerTPGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps, low=200, high=500,
     #                        div_prob=args.div_prob)
-    attacker = AttackerMIFGSM(model, eps=args.max_norm / 255.0, decay=1.0, steps=args.steps, low=400, high=500,
+    attacker = AttackerMIFGSM(model, eps=args.max_norm / 255.0, decay=1.0, steps=args.steps, low=200, high=500,
                               div_prob=args.div_prob)
 
     for ind, (img, label_true, label_target, filenames) in enumerate(loader):

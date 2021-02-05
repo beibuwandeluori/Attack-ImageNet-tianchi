@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # /raid/chenby/tianchi/imagenet/
     parser.add_argument('--input_dir', default='/raid/chenby/tianchi/imagenet/', type=str, help='path to data')
-    parser.add_argument('--output_dir', default='./results/05_ensemble_MIM_div_step100_8_l400/', type=str, help='path to results')
+    parser.add_argument('--output_dir', default='./results/07_ensemble_MIM_step100_8_PGD_step50_4/', type=str, help='path to results')
     parser.add_argument('--batch_size', default=8, type=int, help='mini-batch size')
     parser.add_argument('--steps', default=100, type=int, help='iteration steps')
     parser.add_argument('--max_norm', default=8, type=float, help='Linf limit')
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "5"
     # ensemble model
     model1 = model_selection(model_name='efficientnet-b5', advprop=False)  # efficientnet-b5
     model1 = nn.Sequential(
@@ -82,18 +82,31 @@ if __name__ == '__main__':
     #                     low=200,
     #                     high=500)
     # attacker = torchattacks.PGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps)
-    # attacker = AttackerPGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps, low=200, high=500,
-    #                        div_prob=args.div_prob)
+
     # attacker = AttackerTPGD(model, eps=args.max_norm/255.0, alpha=2/255.0, steps=args.steps, low=200, high=500,
     #                        div_prob=args.div_prob)
-    attacker = AttackerMIFGSM(model, eps=args.max_norm / 255.0, decay=1.0, steps=args.steps, low=400, high=500,
+    attacker = AttackerMIFGSM(model, eps=args.max_norm / 255.0, decay=1.0, steps=args.steps, low=200, high=500,
                               div_prob=args.div_prob)
+    attacker_02 = AttackerPGD(model, eps=args.max_norm/2.0/255.0, alpha=2/255.0, steps=args.steps//2, low=200, high=500,
+                           div_prob=args.div_prob)
 
     for ind, (img, label_true, label_target, filenames) in enumerate(loader):
-
+        # flag = False
+        # for filename in filenames:
+        #     if '2776.jpg' in filename:
+        #         print(filenames)
+        #         print(os.path.join(output_dir, os.path.split(filenames[-1])[-1]))
+        #         print(os.path.exists(os.path.join(output_dir, os.path.split(filenames[-1])[-1])))
+        #         flag = True
+        #         break
+        # if os.path.exists(os.path.join(output_dir, os.path.split(filenames[-1])[-1])) and not flag:
+        #     continue
+        # if not flag:
+        #     continue
         # run attack
         # adv = attacker.attack(model, img.cuda(), label_true.cuda(), label_target.cuda())
-        adv = attacker(img.cuda(), label_true.cuda())
+        adv_01 = attacker(img.cuda(), label_true.cuda())
+        adv = attacker_02(adv_01.cuda(), label_true.cuda())
         # save results
         for bind, filename in enumerate(filenames):
             out_img = adv[bind].detach().cpu().numpy()

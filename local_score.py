@@ -5,7 +5,7 @@ import lpips
 import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 
 
 def load_image(path):
@@ -76,6 +76,6 @@ def get_local_score(attack_acc, src1_path, src2_path):
 
 if __name__ == '__main__':
     src1_path = "/raid/chenby/tianchi/imagenet/images/"  # 原图
-    src2_path = "/data1/cby/py_project/Attack-ImageNet/results/04_ensemble_MIM_div_step100_8_iter2_step50_4/images/"  # 对抗样本
+    src2_path = "/data1/cby/py_project/Attack-ImageNet/results/10_ensemble_MIM_div_se_mask_step100_16_step100_8/images/"  # 对抗样本
     attack_acc = 0.9  # 对抗样本对模型攻击准确率
     get_local_score(attack_acc, src1_path, src2_path)

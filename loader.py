@@ -36,12 +36,19 @@ def input_diversity(image, div_prob=0.5, low=200, high=500):
 
 
 class ImageNet_A(Dataset):
-	def __init__(self, root_dir, csv_name='dev.csv', folder_name='images', use_target=True, transforms=None):
+	def __init__(self, root_dir, csv_name='dev.csv', folder_name='images',
+				 use_target=True,
+				 transforms=None,
+				 mask_root_dir=None,
+				 attack_background=False):
 		# labels_dir = os.path.join(root_dir, csv_name)
 		labels_dir = '/raid/chenby/tianchi/imagenet/' + csv_name
 		self.image_dir = os.path.join(root_dir, folder_name)
 		self.labels = pd.read_csv(labels_dir)
 		self.use_target = use_target
+		self.mask_root_dir = mask_root_dir
+		self.attack_background = attack_background
+
 		self.transforms = transforms
 
 	def __len__(self):
@@ -59,6 +66,19 @@ class ImageNet_A(Dataset):
 			img = in_img / 255.0
 
 		label_true = self.labels.at[idx, 'TrueLabel']
+		if self.mask_root_dir is not None:
+			mask_path = filename.replace(self.image_dir, self.mask_root_dir).replace('jpg', 'png')
+			mask = cv2.imread(mask_path)[:, :, ::-1]
+			mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)//255
+			if self.attack_background:
+				mask = 1 - mask
+			mask = np.expand_dims(mask, axis=0)  # 扩展一个维度
+
+			if self.use_target:
+				label_target = 999 - label_true
+				return img, mask, label_true, label_target, filename
+			else:
+				return img, mask, label_true, filename
 		if self.use_target:
 			# label_target = self.labels.at[idx, 'TargetClass']
 			label_target = 999 - label_true
@@ -72,16 +92,18 @@ if __name__ == '__main__':
 	low = 200
 	high = 500
 	use_target = False
-	# root_dir = '/raid/chenby/tianchi/imagenet'
-	root_dir = '/data1/cby/py_project/Attack-ImageNet/results/02_ensemble_nt/'
+	root_dir = '/raid/chenby/tianchi/imagenet'
+	# root_dir = '/data1/cby/py_project/Attack-ImageNet/results/02_ensemble_nt/'
+	mask_root_dir = '/raid/chenby/tianchi/imagenet/cam_mask_res101'
 	dataset = ImageNet_A(root_dir, csv_name='dev.csv', folder_name='images',  use_target=use_target,
-						 transforms=get_transforms())
+						 transforms=None, mask_root_dir=mask_root_dir, attack_background=True)
+	# print(len(dataset))
 	train_loader = torch.utils.data.DataLoader(dataset, batch_size=8, shuffle=True)
 	if not use_target:
-		for i, (img, label, _) in enumerate(train_loader):
+		for i, (img, mask, label, _) in enumerate(train_loader):
 			img = input_diversity(img, low=low, high=high)
-			print(i, '/', len(train_loader), img.shape, label.shape, label[0])
-			print(torch.max(img))
+			print(i, '/', len(train_loader), img.shape, mask.shape, label.shape, label[0])
+			print(torch.max(img), torch.unique(mask), (mask * img).shape)
 			if i == 20:
 				break
 	else:

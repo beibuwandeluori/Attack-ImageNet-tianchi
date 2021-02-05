@@ -158,6 +158,7 @@ class AttackerPGD(torchattacks.PGD):
 
             grad = torch.autograd.grad(cost, adv_images,
                                        retain_graph=False, create_graph=False)[0]
+            # grad = grad * mask
             adv_images = adv_images.detach() - self.alpha * grad.sign()
             delta = torch.clamp(adv_images - images, min=-self.eps, max=self.eps)
             adv_images = torch.clamp(images + delta, min=0, max=1).detach()
@@ -232,7 +233,7 @@ class AttackerMIFGSM(torchattacks.MIFGSM):
         self.high = high
         self.div_prob = div_prob
 
-    def forward(self, images, labels):
+    def forward(self, images, labels, mask=None):
         r"""
         Overridden.
         """
@@ -261,7 +262,8 @@ class AttackerMIFGSM(torchattacks.MIFGSM):
             grad = grad / grad_norm.view([-1] + [1] * (len(grad.shape) - 1))
             grad = grad + momentum * self.decay
             momentum = grad
-
+            if mask is not None:
+                grad = grad * mask
             adv_images = adv_images.detach() - self.alpha * grad.sign()
             delta = torch.clamp(adv_images - images, min=-self.eps, max=self.eps)
             adv_images = torch.clamp(images + delta, min=0, max=1).detach()

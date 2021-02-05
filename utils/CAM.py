@@ -6,6 +6,7 @@ from torch.nn import functional as F
 import numpy as np
 import cv2
 import os
+import pretrainedmodels
 
 def preprocess_image(img):
     preprocess = transforms.Compose([
@@ -41,13 +42,14 @@ if __name__ == '__main__':
     # input image
     finalconv_name = 'layer4'
     # networks
-    net = models.resnet101(pretrained=True)
+    # net = models.resnet101(pretrained=True)
+    net = pretrainedmodels.se_resnext101_32x4d(num_classes=1000, pretrained='imagenet')
     if is_cuda:
         net = net.cuda()
     net.eval()
 
     root_path = '/raid/chenby/tianchi/imagenet/images'
-    save_root = '/raid/chenby/tianchi/imagenet/cam_mask_res101'
+    save_root = '/raid/chenby/tianchi/imagenet/cam_mask_se_res101_4d_03'
     if not os.path.isdir(save_root):
         os.makedirs(save_root)
     image_names = sorted(os.listdir(root_path))[:]
@@ -82,7 +84,7 @@ if __name__ == '__main__':
         # generate class activation mapping for the top1 prediction
         CAMs = returnCAM(features_blobs[0], weight_softmax, [idx[0]])
         # print(np.unique(CAMs[0]), np.max(CAMs[0]/255.0))
-        CAMs[0] = np.uint8(CAMs[0]/255.0 > 0.5) * 255
+        CAMs[0] = np.uint8(CAMs[0]/255.0 > 0.3) * 255
         # print(np.unique(CAMs[0]), np.max(CAMs[0] / 255.0))
         # render the CAM and output
         print(f'output {image_names[index]} for the top1 prediction: {idx[0]}')
@@ -95,3 +97,4 @@ if __name__ == '__main__':
 
         save_path = os.path.join(save_root, image_names[index].replace('jpg', 'png'))
         cv2.imwrite(save_path, result)
+        # cv2.imwrite('CAM.jpg', result)

@@ -16,15 +16,18 @@ class Ensemble(nn.Module):
         super(Ensemble, self).__init__()
         self.model1 = model1
         self.model2 = model2
-        # self.model3 = model3
+        self.model3 = model3
 
     def forward(self, x):
         logits1 = self.model1(x)
         logits2 = self.model2(x)
-        # logits3 = self.model3(x)
 
         # fuse logits
-        logits = (logits1 + logits2) / 2
+        if self.model3 is not None:
+            logits3 = self.model3(x)
+            logits = (logits1 + logits2 + logits3) / 3
+        else:
+            logits = (logits1 + logits2) / 2
 
         return logits
 
@@ -83,16 +86,16 @@ if __name__ == '__main__':
     # mean = [0.5, 0.5, 0.5]
     # std = [0.5, 0.5, 0.5]
 
-    input_dir = '/raid/chenby/tianchi/imagenet/'
-    # input_dir = '/data1/cby/py_project/Attack-ImageNet/results/04_ensemble_MIM_div_step100_8_iter2_step50_4/'
+    # input_dir = '/raid/chenby/tianchi/imagenet/'
+    input_dir = '/data1/cby/py_project/Attack-ImageNet/results/08_ensemble_MIM_div_mask_step100_16_step100_8/'
     batch_size = 32
     size = 224  # 456
     size_2 = 224
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "4"
     # ensemble model
     # model = load_model()
-    model = model_selection(model_name='vgg19', advprop=False)  # efficientnet-b5
+    model = model_selection(model_name='se_resnext101_32x4d', advprop=False)  # efficientnet-b5
     model = nn.Sequential(
         Resize(input_size=[size, size]),
         Normalize(mean, std),
@@ -104,13 +107,20 @@ if __name__ == '__main__':
     #     Normalize(mean, std),
     #     model2
     # )
-    # model = Ensemble(model, model2)
+    # model3 = model_selection(model_name='inceptionv4', advprop=False)
+    # model3 = nn.Sequential(
+    #     Resize(input_size=[299, 299]),
+    #     Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    #     model3
+    # )
+    # model = Ensemble(model, model2, model3)
 
     model.cuda()
     model.eval()
 
     # set dataset
     # dataset = ImageNet_A(input_dir, use_target=False, transforms=get_transforms(size, mean, std))
+    print('input_dir:', input_dir)
     dataset = ImageNet_A(input_dir, use_target=False, transforms=None)
     loader = torch.utils.data.DataLoader(dataset,
                                          batch_size=batch_size,
